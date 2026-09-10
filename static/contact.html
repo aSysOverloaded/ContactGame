@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Contact — Open Channel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0f1c;
+    --bg-2:#0d1424;
+    --panel:#121b30;
+    --panel-2:#17223d;
+    --line:#243250;
+    --text:#eeeadf;
+    --text-dim:#8b96b3;
+    --text-faint:#5a6685;
+    --amber:#e8a33d;
+    --amber-dim:#7a5a22;
+    --teal:#3fcf9b;
+    --red:#d9594b;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 50% -10%, #16223e 0%, transparent 60%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px),
+      var(--bg);
+    color:var(--text);
+    font-family:'Work Sans', sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:0;
+  }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  #app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    background:var(--bg-2);
+    border-left:1px solid var(--line);
+    border-right:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .topbar{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    padding:18px 20px 14px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:0.02em;
+    color:var(--text);
+  }
+  .brand span{ color:var(--amber); }
+  .round-tag{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--text-faint);
+  }
+  .main{
+    flex:1;
+    padding:22px 20px 100px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  h1{
+    font-family:'Work Sans', sans-serif;
+    font-weight:700;
+    font-size:26px;
+    line-height:1.25;
+    margin:0 0 6px;
+  }
+  p.lead{
+    color:var(--text-dim);
+    font-size:14.5px;
+    line-height:1.55;
+    margin:0;
+  }
+  .field{ display:flex; flex-direction:column; gap:6px; margin-top:4px;}
+  .field label{ font-size:13px; color:var(--text-dim); font-weight:500; }
+  .field .hint{ font-size:12px; color:var(--text-faint); margin-top:-2px;}
+  input[type=text], input[type=password], textarea, select{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--text);
+    padding:11px 12px;
+    font-size:15px;
+    font-family:'Work Sans', sans-serif;
+    outline:none;
+  }
+  textarea{ resize:vertical; min-height:64px; line-height:1.4; }
+  input:focus, textarea:focus, select:focus, button:focus-visible{
+    border-color:var(--amber);
+    box-shadow:0 0 0 3px rgba(232,163,61,0.18);
+  }
+  .diff-row{ display:flex; gap:8px; }
+  .diff-btn{
+    flex:1;
+    padding:10px 6px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--text-dim);
+    font-size:13.5px;
+    font-family:'Work Sans', sans-serif;
+    cursor:pointer;
+  }
+  .diff-btn:disabled{ cursor:default; }
+  .diff-btn.active{
+    border-color:var(--amber);
+    color:var(--amber);
+    background:rgba(232,163,61,0.08);
+  }
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:13px 18px;
+    border-radius:8px;
+    border:1px solid transparent;
+    font-family:'Work Sans', sans-serif;
+    font-weight:600;
+    font-size:15px;
+    cursor:pointer;
+    width:100%;
+  }
+  .btn-primary{ background:var(--amber); color:#1a1206; }
+  .btn-primary:disabled{ opacity:0.5; cursor:default; }
+  .btn-outline{ background:transparent; border-color:var(--line); color:var(--text); }
+  .btn-teal{ background:var(--teal); color:#062018; }
+  .btn-ghost{
+    background:none; border:none; color:var(--text-faint);
+    font-size:13px; text-decoration:underline; text-underline-offset:3px;
+    width:auto; padding:6px 0;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px;
+  }
+  .signal{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:20px 18px;
+    text-align:center;
+  }
+  .signal .caption{
+    font-size:11.5px;
+    color:var(--text-faint);
+    font-family:'JetBrains Mono', monospace;
+    margin-bottom:12px;
+  }
+  .letters{
+    display:flex;
+    justify-content:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .letter-box{
+    width:38px; height:46px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--bg-2);
+    border:1px solid var(--amber-dim);
+    border-radius:6px;
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:22px;
+    color:var(--amber);
+  }
+  .letter-box.new{ animation:popIn 0.4s ease; }
+  @keyframes popIn{
+    0%{ transform:scale(0.4) rotateX(70deg); opacity:0; }
+    100%{ transform:scale(1) rotateX(0); opacity:1; }
+  }
+  .cursor{
+    width:10px; height:28px; align-self:center;
+    background:var(--amber);
+    opacity:0.75;
+    animation:blink 1.1s steps(1) infinite;
+    border-radius:1px;
+  }
+  @keyframes blink{ 50%{ opacity:0; } }
+  .clue-box{
+    background:var(--panel-2);
+    border-left:3px solid var(--amber);
+    border-radius:6px;
+    padding:14px 16px;
+  }
+  .clue-box .who{ font-size:12px; color:var(--text-faint); margin-bottom:4px; }
+  .clue-box .text{ font-size:17px; line-height:1.4; }
+  .actions{ display:flex; flex-direction:column; gap:10px; }
+  .actions-row{ display:flex; gap:10px; }
+  .actions-row .btn{ width:auto; flex:1; }
+  .log{ display:flex; flex-direction:column; gap:10px; }
+  .log-title{ font-size:12px; color:var(--text-faint); font-family:'JetBrains Mono', monospace; letter-spacing:0.03em; }
+  .log-entry{
+    border-left:2px solid var(--line);
+    padding:2px 0 2px 12px;
+    font-size:13.5px;
+    color:var(--text-dim);
+  }
+  .log-entry.contact{ border-color:var(--teal); }
+  .log-entry.blocked{ border-color:var(--red); }
+  .log-entry .clue-line{ color:var(--text); margin-bottom:2px; }
+  .log-entry .tag{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    padding:1px 6px;
+    border-radius:4px;
+    margin-right:6px;
+  }
+  .tag.contact{ background:rgba(63,207,155,0.15); color:var(--teal); }
+  .tag.blocked{ background:rgba(217,89,75,0.15); color:var(--red); }
+  .tag.miss{ background:rgba(139,150,179,0.12); color:var(--text-faint); }
+  .countdown-wrap{
+    display:flex; align-items:center; justify-content:center;
+    height:140px;
+  }
+  .countdown-num{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:clamp(28px, 12vw, 64px);
+    color:var(--amber);
+    animation:countPop 0.5s ease;
+    text-align:center;
+  }
+  @keyframes countPop{
+    0%{ transform:scale(1.6); opacity:0; }
+    60%{ transform:scale(0.95); opacity:1; }
+    100%{ transform:scale(1); }
+  }
+  .result-banner{
+    text-align:center;
+    padding:22px 16px;
+    border-radius:var(--radius);
+  }
+  .result-banner.contact{ background:rgba(63,207,155,0.1); border:1px solid rgba(63,207,155,0.4); }
+  .result-banner.blocked{ background:rgba(217,89,75,0.1); border:1px solid rgba(217,89,75,0.4); }
+  .result-banner.miss{ background:var(--panel); border:1px solid var(--line); }
+  .result-title{ font-family:'JetBrains Mono', monospace; font-weight:700; font-size:20px; margin-bottom:6px; }
+  .result-title.contact{ color:var(--teal); }
+  .result-title.blocked{ color:var(--red); }
+  .compare{ display:flex; justify-content:center; flex-wrap:wrap; row-gap:10px; gap:14px; margin:14px 0; font-size:14px;}
+  .compare .who{ color:var(--text-faint); font-size:11.5px; margin-bottom:3px;}
+  .compare .word{ font-family:'JetBrains Mono', monospace; font-size:16px; }
+  .control-line{
+    font-size:13.5px; color:var(--text-dim); font-style:italic;
+    margin-top:8px; line-height:1.4;
+  }
+  .scoreboard{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    padding:5px 10px;
+    border-radius:20px;
+  }
+  .chip b{ color:var(--amber); font-weight:700; }
+  .chip.offline{ opacity:0.45; }
+  .banner-error{
+    background:rgba(217,89,75,0.1);
+    border:1px solid rgba(217,89,75,0.4);
+    color:#f3b8b0;
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:13px;
+  }
+  .loading-line{
+    display:flex; align-items:center; gap:10px;
+    color:var(--text-dim); font-size:13.5px;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--amber); animation:pulse 1s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ opacity:0.3;} 50%{ opacity:1;} }
+  .footer-note{ text-align:center; color:var(--text-faint); font-size:12px; margin-top:6px; }
+  .room-code{
+    font-family:'JetBrains Mono', monospace; font-weight:700;
+    color:var(--amber); letter-spacing:0.12em;
+  }
+  .code-input{ text-transform:uppercase; letter-spacing:0.2em; font-family:'JetBrains Mono', monospace !important; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ---------- state ----------
+// `state` is the room as the server sends it (sanitized: no secret word, no hidden words).
+// `ui` is this device's own screen state.
+let state = null;
+const ui = {
+  lobbyMode: 'create',     // create | join
+  screen: null,            // 'full-guess' is a local screen, like in the single-phone version
+  error: null,
+  fullGuessMsg: null,
+  countdownText: '',
+  justRevealed: false,
+  connecting: false,
+  reconnecting: false,
+};
+let ws = null;
+const SESSION_KEY = 'contact-session';
+let session = loadSession();   // {code, playerId, name} - lets a device rejoin after a drop
+
+function loadSession(){ try{ return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }catch(e){ return null; } }
+function saveSession(s){ session = s; try{ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }catch(e){} }
+function clearSession(){ session = null; try{ localStorage.removeItem(SESSION_KEY); }catch(e){} }
+
+// Everything typed by a player or written by the model goes through esc() before innerHTML.
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function me(){ return state && state.players.find(p => p.id === state.you); }
+function isHost(){ return state && state.you === state.host; }
+function hostName(){ const h = state && state.players.find(p => p.id === state.host); return h ? h.name : 'the host'; }
+function onlineCount(){ return state ? state.players.filter(p => p.online).length : 0; }
+
+// ---------- connection ----------
+function connect(hello){
+  ui.connecting = true;
+  render();
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const sock = new WebSocket(`${proto}://${location.host}/ws`);
+  ws = sock;
+  sock.onopen = () => sock.send(JSON.stringify(hello));
+  sock.onmessage = ev => onMessage(JSON.parse(ev.data), hello);
+  sock.onclose = () => {
+    if(ws !== sock) return;           // replaced by a newer connection
+    ws = null;
+    ui.connecting = false;
+    if(session && state){             // dropped mid-game: keep retrying quietly
+      ui.reconnecting = true;
+      render();
+      setTimeout(() => { if(session && !ws) connect({ type:'join', code: session.code, playerId: session.playerId, name: session.name }); }, 1500);
+    } else {
+      render();
+    }
+  };
+}
+
+function onMessage(msg, hello){
+  if(msg.type === 'joined'){
+    saveSession({ code: msg.code, playerId: msg.playerId, name: hello.name || (session && session.name) || '' });
+    ui.connecting = false;
+    ui.reconnecting = false;
+    return;
+  }
+  if(msg.type === 'error'){
+    if(!state || ui.reconnecting){    // lobby / rejoin failure (e.g. server restarted, room gone)
+      ui.connecting = false;
+      if(hello.type === 'join' && hello.playerId){ clearSession(); state = null; ui.reconnecting = false; }
+    }
+    ui.error = msg.message;
+    render();
+    return;
+  }
+  if(msg.type === 'fullGuessMiss'){
+    ui.fullGuessMsg = msg.message;
+    render();
+    return;
+  }
+  if(msg.type === 'state'){
+    const prev = state;
+    state = msg;
+    if(prev && prev.revealed && prev.round === state.round && state.revealed.length > prev.revealed.length){
+      ui.justRevealed = true;
+      setTimeout(() => { ui.justRevealed = false; }, 500);
+    }
+    if(!prev || prev.phase !== state.phase){
+      ui.error = null;
+      if(state.phase !== 'idle'){ ui.screen = null; }
+      if(state.phase === 'countdown') runCountdown();
+    }
+    if(prev && prev.round !== state.round){ ui.fullGuessMsg = null; ui.screen = null; }
+    render();
+  }
+}
+
+function send(type, payload){
+  if(!ws || ws.readyState !== 1){ ui.error = 'Signal lost — reconnecting…'; render(); return; }
+  ui.error = null;
+  ws.send(JSON.stringify(Object.assign({ type }, payload || {})));
+}
+
+function val(id){ const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+// ---------- lobby ----------
+function setLobbyMode(m){ ui.lobbyMode = m; ui.error = null; render(); }
+
+function createRoom(){
+  const name = val('lobbyName'), group = val('lobbyGroup');
+  if(!name){ ui.error = 'Add your name so everyone knows who is who.'; render(); return; }
+  ui.error = null;
+  connect({ type:'create', name, group });
+}
+
+function joinRoom(){
+  const code = val('lobbyCode').toUpperCase(), name = val('lobbyName');
+  if(code.length !== 4 || !name){ ui.error = 'Need the 4-letter room code and your name.'; render(); return; }
+  ui.error = null;
+  connect({ type:'join', code, name });
+}
+
+function leaveRoom(){
+  if(!confirm('Leave this room on this device?')) return;
+  clearSession();
+  const sock = ws; ws = null; state = null;
+  if(sock) sock.close();
+  render();
+}
+
+// ---------- actions (each one is a request to the server) ----------
+function setDifficulty(d){ if(isHost()) send('set_difficulty', { difficulty: d }); }
+function beginGame(){ send('begin_game'); }
+function removeLocalTerm(i){
+  const t = state.dictionary[i];
+  if(t && confirm(`Remove "${t.term}" from your local dictionary?`)) send('remove_term', { term: t.term });
+}
+function saveReference(){
+  send('save_reference', { term: val('refTerm'), meaning: val('refMeaning') });
+}
+
+function openClueForm(){ ui.screen = null; send('open_clue'); }
+function backToIdle(){
+  if(ui.screen === 'full-guess'){ ui.screen = null; ui.fullGuessMsg = null; render(); return; }
+  send('back_to_idle');
+}
+
+function submitClue(){
+  const text = val('clueText'), word = val('clueWord'), name = val('clueGiver');
+  if(!text || !word){
+    ui.error = 'Need both a clue and the word you\'re describing.';
+    render();
+    return;
+  }
+  send('submit_clue', { text, word, name });
+}
+
+function noContactCalled(){ send('no_contact'); }
+function openContactForm(){ send('open_contact'); }
+function backToClue(){ send('back_to_clue'); }
+
+function submitContactGuess(){
+  const word = val('contactWord'), name = val('contactCaller');
+  if(!word){
+    ui.error = 'Type the word you think it is.';
+    render();
+    return;
+  }
+  send('submit_contact', { word, name });
+}
+
+// The server times the countdown; every device plays the same 5 steps.
+async function runCountdown(){
+  const steps = ['STAND BY', '3', '2', '1', 'MARK'];
+  for(const s of steps){
+    if(!state || state.phase !== 'countdown') return;
+    ui.countdownText = s;
+    render();
+    await new Promise(r => setTimeout(r, 480));
+  }
+}
+
+function continueAfterResult(){ send('continue'); }
+
+function openFullGuess(){ ui.screen = 'full-guess'; ui.fullGuessMsg = null; render(); }
+function submitFullGuess(){
+  const word = val('fullGuessWord'), name = val('fullGuessName');
+  if(!word) return;
+  ui.fullGuessMsg = null;
+  send('full_guess', { word, name });
+}
+
+function forfeitRound(){ send('forfeit'); }
+function startNewRound(){ send('new_round'); }
+
+// ---------- render ----------
+// Other devices can trigger a re-render at any moment, so keep whatever is half-typed.
+function render(){
+  const app = document.getElementById('app');
+  const typed = {};
+  app.querySelectorAll('input[id], textarea[id]').forEach(el => { typed[el.id] = el.value; });
+  const active = document.activeElement;
+  const focusId = active && active.id && app.contains(active) ? active.id : null;
+  let selStart = null, selEnd = null;
+  try{ if(focusId){ selStart = active.selectionStart; selEnd = active.selectionEnd; } }catch(e){}
+
+  const code = state ? state.code : '';
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="brand">CONTACT<span> · CHANNEL OPEN</span></div>
+      <div class="round-tag">${code ? `ROOM <span class="room-code">${esc(code)}</span>` : ''}${state && state.phase !== 'setup' ? ' · RD ' + String(state.round).padStart(2,'0') : ''}</div>
+    </div>
+    <div class="main">${ui.reconnecting ? `<div class="loading-line"><span class="dot"></span> Signal lost — reconnecting…</div>` : ''}${renderPhase()}</div>
+  `;
+
+  for(const id in typed){
+    const el = document.getElementById(id);
+    if(el) el.value = typed[id];
+  }
+  if(focusId){
+    const el = document.getElementById(focusId);
+    if(el){ el.focus(); try{ if(selStart !== null) el.setSelectionRange(selStart, selEnd); }catch(e){} }
+  }
+}
+
+function renderPhase(){
+  if(!state) return renderLobby();
+  if(state.phase === 'setup') return renderSetup();
+  if(state.loading) return renderLoading();
+  if(ui.screen === 'full-guess' && state.phase === 'idle') return renderFullGuess();
+  if(state.phase === 'idle') return renderIdle();
+  if(state.phase === 'clue-entry') return renderClueEntry();
+  if(state.phase === 'clue-shown') return renderClueShown();
+  if(state.phase === 'contact-entry') return renderContactEntry();
+  if(state.phase === 'countdown') return renderCountdown();
+  if(state.phase === 'result') return renderResult();
+  if(state.phase === 'won') return renderWon();
+  return '';
+}
+
+function renderLoading(){
+  return `<div class="loading-line"><span class="dot"></span> ${esc(state.loadingLabel)}</div>`;
+}
+
+function renderLobby(){
+  if(ui.connecting){
+    return `<div class="loading-line"><span class="dot"></span> ${session ? 'Rejoining your room…' : 'Tuning in…'}</div>`;
+  }
+  const join = ui.lobbyMode === 'join';
+  const lastName = session && session.name ? esc(session.name) : '';
+  return `
+    <div>
+      <h1>Pass the phone. Keep a secret.</h1>
+      <p class="lead">CONTROL — an AI Wordmaster — picks a secret word, listens to your clues, and tries to beat you to every guess. Play on one phone passed around the room, or have everyone join on their own.</p>
+    </div>
+    <div class="diff-row">
+      <button class="diff-btn ${!join?'active':''}" onclick="setLobbyMode('create')">Start a room</button>
+      <button class="diff-btn ${join?'active':''}" onclick="setLobbyMode('join')">Join a room</button>
+    </div>
+    ${join ? `
+    <div class="field">
+      <label>Room code</label>
+      <input type="text" id="lobbyCode" class="code-input" maxlength="4" autocomplete="off" placeholder="ABCD">
+    </div>` : ''}
+    <div class="field">
+      <label>Your name</label>
+      <input type="text" id="lobbyName" maxlength="24" value="${lastName}" placeholder="What should CONTROL call you?">
+    </div>
+    ${!join ? `
+    <div class="field">
+      <label>Group name</label>
+      <input type="text" id="lobbyGroup" maxlength="60" placeholder="e.g. Friday crew">
+      <div class="hint">CONTROL remembers each group by this name — use the same one next time and it picks up where it left off.</div>
+    </div>` : ''}
+    ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
+    <button class="btn btn-primary" onclick="${join ? 'joinRoom()' : 'createRoom()'}">${join ? 'Join the channel' : 'Create room'}</button>
+  `;
+}
+
+function renderPlayers(){
+  return `<div class="scoreboard">${state.players.map(p =>
+    `<div class="chip ${p.online ? '' : 'offline'}">${esc(p.name)}${p.id === state.host ? ' <b>★</b>' : ''}${p.id === state.you ? ' (you)' : ''}</div>`
+  ).join('')}</div>`;
+}
+
+function renderSetup(){
+  const host = isHost();
+  const x = (fn, i) => host ? ` <span onclick="${fn}(${i})" style="cursor:pointer;color:var(--red);margin-left:5px;">✕</span>` : '';
+  return `
+    <div>
+      <h1>Channel ${esc(state.code)} is open.</h1>
+      <p class="lead">Everyone else can join from their phone with code <span class="room-code">${esc(state.code)}</span> — or just pass this one around. Group: ${esc(state.group)}.</p>
+    </div>
+    <div class="field">
+      <label>In the room</label>
+      ${renderPlayers()}
+    </div>
+    <div class="field">
+      <label>Difficulty</label>
+      <div class="diff-row">
+        <button class="diff-btn ${state.difficulty==='easy'?'active':''}" ${host?'':'disabled'} onclick="setDifficulty('easy')">Easy</button>
+        <button class="diff-btn ${state.difficulty==='medium'?'active':''}" ${host?'':'disabled'} onclick="setDifficulty('medium')">Medium</button>
+        <button class="diff-btn ${state.difficulty==='hard'?'active':''}" ${host?'':'disabled'} onclick="setDifficulty('hard')">Hard</button>
+      </div>
+    </div>
+    ${state.dictionary.length ? `
+    <div class="field">
+      <label>Your local dictionary · ${state.dictionary.length} word${state.dictionary.length === 1 ? '' : 's'}</label>
+      <div class="scoreboard">${state.dictionary.map((t,i) => `<div class="chip">${esc(t.term)} <span style="color:var(--text-faint);">— ${esc(t.meaning)}</span>${t.examples > 1 ? ` <b>×${t.examples}</b>` : ''}${x('removeLocalTerm', i)}</div>`).join('')}</div>
+      <div class="hint">Words and meanings your group saved after CONTROL missed them. CONTROL checks these whenever the letters fit${host ? ' — tap ✕ to remove one' : ''}.</div>
+    </div>` : `
+    <div class="field"><div class="hint">CONTROL doesn't know your group's local words yet. Whenever it misses a clue, you'll get the option to save that word and what it means, and CONTROL will use it from then on.</div></div>`}
+    ${host ? `
+    ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
+    <button class="btn btn-primary" onclick="beginGame()">Open the channel</button>
+    ` : `
+    <div class="loading-line"><span class="dot"></span> Waiting for ${esc(hostName())} to open the channel…</div>
+    `}
+    <button class="btn-ghost" onclick="leaveRoom()" style="margin:0 auto;">Leave room</button>
+  `;
+}
+
+function renderSignal(caption, extra){
+  const boxes = state.revealed.split('').map((ch,i) => {
+    const isNew = ui.justRevealed && i === state.revealed.length - 1;
+    return `<div class="letter-box ${isNew?'new':''}">${esc(ch)}</div>`;
+  }).join('');
+  return `
+    <div class="signal">
+      <div class="caption">${caption}</div>
+      <div class="letters">${boxes}<div class="cursor"></div></div>
+      ${extra||''}
+    </div>
+  `;
+}
+
+function renderScoreboard(){
+  const names = Object.keys(state.scoreboard);
+  if(!names.length) return '';
+  names.sort((a,b)=> state.scoreboard[b]-state.scoreboard[a]);
+  return `<div class="scoreboard">${names.map(n=>`<div class="chip">${esc(n)} <b>${state.scoreboard[n]}</b></div>`).join('')}</div>`;
+}
+
+function renderLog(){
+  if(!state.log.length) return '';
+  return `
+    <div class="log">
+      <div class="log-title">TRANSMISSION LOG</div>
+      ${state.log.slice(0,6).map(e => `
+        <div class="log-entry ${esc(e.type)}">
+          <div class="clue-line"><span class="tag ${esc(e.type)}">${esc(e.type.toUpperCase())}</span>${esc(e.clue)}</div>
+          <div>${esc(e.note)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// Every word revealed this round - players' words and CONTROL's guesses.
+function renderGuesses(){
+  if(!state.guesses.length) return '';
+  return `
+    <div class="log">
+      <div class="log-title">GUESSES THIS ROUND</div>
+      <div class="scoreboard">${state.guesses.map(g =>
+        `<div class="chip" style="${g.kind === 'control' ? 'color:var(--red);border-color:rgba(217,89,75,0.4);' : ''}">${esc(g.word)} <span style="color:var(--text-faint);">· ${esc(g.by)}</span></div>`
+      ).join('')}</div>
+    </div>
+  `;
+}
+
+function renderIdle(){
+  return `
+    ${renderSignal('LETTERS DECODED SO FAR')}
+    <div class="actions">
+      <button class="btn btn-primary" onclick="openClueForm()">Give a clue</button>
+      <div class="actions-row">
+        <button class="btn btn-outline" onclick="openFullGuess()">Break the whole word</button>
+      </div>
+    </div>
+    ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
+    ${renderScoreboard()}
+    ${renderGuesses()}
+    ${renderLog()}
+    ${isHost() ? `<button class="btn-ghost" onclick="forfeitRound()" style="margin:0 auto;">Give up this round &amp; start fresh</button>` : ''}
+  `;
+}
+
+function renderClueEntry(){
+  const cc = state.currentClue;
+  if(cc.giverId !== state.you){
+    return `
+      ${renderSignal('CURRENT PREFIX')}
+      <div class="loading-line"><span class="dot"></span> ${esc(cc.giverName || 'Someone')} is writing a clue…</div>
+      ${isHost() ? `<button class="btn-ghost" onclick="backToIdle()" style="margin:0 auto;">Cancel their clue</button>` : ''}
+    `;
+  }
+  const myName = me() ? esc(me().name) : '';
+  return `
+    ${renderSignal('CURRENT PREFIX', '')}
+    <div class="card">
+      <div class="field">
+        <label>Your name (optional)</label>
+        <input type="text" id="clueGiver" value="${myName}" placeholder="Who's giving the clue?">
+      </div>
+      <div class="field">
+        <label>Your clue</label>
+        <textarea id="clueText" placeholder="Describe a different word that starts with the current letters — vague enough for your friends, too tricky for CONTROL."></textarea>
+      </div>
+      <div class="field">
+        <label>The word you're describing</label>
+        <input type="password" id="clueWord" autocomplete="new-password" placeholder="Kept hidden — look away if you're worried!">
+        <div class="hint">Only revealed if someone calls Contact and matches you.</div>
+      </div>
+      ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
+      <div class="actions" style="margin-top:6px;">
+        <button class="btn btn-primary" onclick="submitClue()">Send clue</button>
+        <button class="btn btn-outline" onclick="backToIdle()">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderClueShown(){
+  const cc = state.currentClue;
+  const ownClue = cc.giverId === state.you && onlineCount() > 1;
+  return `
+    ${renderSignal('CURRENT PREFIX')}
+    <div class="clue-box">
+      <div class="who">${cc.giverName ? esc(cc.giverName) + ' says:' : 'Clue:'}</div>
+      <div class="text">${esc(cc.text)}</div>
+    </div>
+    <div class="loading-line"><span class="dot"></span> CONTROL is listening in…</div>
+    ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
+    <div class="actions">
+      ${ownClue
+        ? `<p class="footer-note">Your clue is out — wait for someone to call Contact.</p>`
+        : `<button class="btn btn-teal" onclick="openContactForm()">Someone's got it — Contact!</button>`}
+      <button class="btn btn-outline" onclick="noContactCalled()">Nobody got it</button>
+    </div>
+  `;
+}
+
+function renderContactEntry(){
+  const cc = state.currentClue;
+  if(cc.callerId !== state.you){
+    return `
+      <div class="clue-box">
+        <div class="who">${cc.giverName ? esc(cc.giverName) + ' says:' : 'Clue:'}</div>
+        <div class="text">${esc(cc.text)}</div>
+      </div>
+      <div class="loading-line"><span class="dot"></span> ${esc(cc.callerName || 'Someone')} is calling Contact…</div>
+      <p class="footer-note">Get ready — say "3, 2, 1" out loud together, then both say your word.</p>
+      ${isHost() ? `<button class="btn-ghost" onclick="backToClue()" style="margin:0 auto;">Cancel their call</button>` : ''}
+    `;
+  }
+  const myName = me() ? esc(me().name) : '';
+  return `
+    <div class="card">
+      <div class="field">
+        <label>Your name (optional)</label>
+        <input type="text" id="contactCaller" value="${myName}" placeholder="Who's calling Contact?">
+      </div>
+      <div class="field">
+        <label>The word you think it is</label>
+        <input type="password" id="contactWord" autocomplete="new-password" placeholder="Type it, then look up and count down together.">
+      </div>
+      ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
+      <div class="actions" style="margin-top:6px;">
+        <button class="btn btn-teal" onclick="submitContactGuess()">We're ready — count it down</button>
+        <button class="btn btn-outline" onclick="backToClue()">Back</button>
+      </div>
+    </div>
+    <p class="footer-note">Say "3, 2, 1" out loud together, then tap the button above the moment you both say your word.</p>
+  `;
+}
+
+function renderCountdown(){
+  return `<div class="countdown-wrap"><div class="countdown-num">${esc(ui.countdownText || 'STAND BY')}</div></div>`;
+}
+
+function renderResult(){
+  const r = state.lastResult;
+  const title = r.outcome === 'contact' ? 'CONTACT MADE' : r.outcome === 'blocked' ? 'BLOCKED' : 'NO CONTACT';
+  return `
+    <div class="result-banner ${esc(r.outcome)}">
+      <div class="result-title ${esc(r.outcome)}">${title}</div>
+      <div class="compare">
+        <div><div class="who">CLUE-GIVER</div><div class="word">${esc(r.giverWord)}</div></div>
+        <div><div class="who">CONTACT CALL</div><div class="word">${esc(r.callerWord)}</div></div>
+        ${r.controlGuess ? `<div><div class="who">CONTROL GUESSED</div><div class="word" style="color:${r.outcome==='blocked' ? 'var(--red)' : 'var(--text)'};">${esc(r.controlGuess)}</div></div>` : ''}
+      </div>
+      ${r.outcome === 'blocked' ? `<div class="control-line" style="font-style:normal; color:var(--text-dim);">CONTROL's guess matched the word — that's what blocked it.</div>` : ''}
+      <div class="control-line">"${esc(r.controlLine)}"</div>
+    </div>
+    ${r.secretHit ? `
+    <div class="result-banner contact">
+      <div class="result-title contact">THAT'S THE WORD</div>
+      <div class="control-line" style="font-style:normal;">${esc(r.secretHit.word)} came up in ${esc(r.secretHit.names.join(' & '))}'s word${r.outcome === 'blocked' ? ' — blocked or not, the secret is out' : ''}. Round over.</div>
+    </div>` : renderSignal('LETTERS DECODED SO FAR')}
+    ${r.canSave ? renderSaveReference(r) : ''}
+    ${renderGuesses()}
+    <button class="btn btn-primary" onclick="continueAfterResult()">${r.secretHit ? 'See the word' : 'Continue'}</button>
+  `;
+}
+
+// CONTROL missed this one: let the group teach it the word and what it means locally.
+function renderSaveReference(r){
+  if(r.saved){
+    return `<div class="card"><div class="loading-line" style="color:var(--teal);">✓ Saved to your local dictionary. CONTROL will know "${esc(r.giverWord)}" next time.</div></div>`;
+  }
+  return `
+    <div class="card">
+      <div class="field" style="margin-top:0;">
+        <label>CONTROL didn't get this one. Local word or reference?</label>
+        <div class="hint">Save it so CONTROL learns what your group means by it. Edit either box first if needed.</div>
+      </div>
+      <div class="field">
+        <label>Word</label>
+        <input type="text" id="refTerm" maxlength="40" value="${esc(r.giverWord)}">
+      </div>
+      <div class="field">
+        <label>What it means here</label>
+        <textarea id="refMeaning" maxlength="300">${esc(r.clue)}</textarea>
+      </div>
+      ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
+      <div class="actions" style="margin-top:6px;">
+        <button class="btn btn-outline" onclick="saveReference()">Save as local reference</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderWon(){
+  return `
+    <div class="result-banner contact">
+      <div class="result-title contact">WORD BROKEN</div>
+      <div class="compare"><div><div class="word" style="font-size:22px;">${esc(state.secretWord)}</div></div></div>
+      ${state.winner ? `<div class="control-line">Credit to ${esc(state.winner)}.</div>` : ''}
+      <div class="control-line">${esc(state.flavor)}</div>
+    </div>
+    ${renderScoreboard()}
+    <button class="btn btn-primary" onclick="startNewRound()">Start next transmission</button>
+  `;
+}
+
+function renderFullGuess(){
+  const myName = me() ? esc(me().name) : '';
+  return `
+    <div class="card">
+      <div class="field">
+        <label>Your name (optional)</label>
+        <input type="text" id="fullGuessName" value="${myName}" placeholder="Who's guessing?">
+      </div>
+      <div class="field">
+        <label>The full secret word</label>
+        <input type="text" id="fullGuessWord" placeholder="Type your best shot">
+      </div>
+      ${ui.fullGuessMsg ? `<div class="banner-error">${esc(ui.fullGuessMsg)}</div>` : ''}
+      ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
+      <div class="actions" style="margin-top:6px;">
+        <button class="btn btn-primary" onclick="submitFullGuess()">Guess it</button>
+        <button class="btn btn-outline" onclick="backToIdle()">Back</button>
+      </div>
+    </div>
+  `;
+}
+
+// ---------- boot ----------
+if(session && session.code && session.playerId){
+  connect({ type:'join', code: session.code, playerId: session.playerId, name: session.name });
+} else {
+  render();
+}
+</script>
+</body>
+</html>
