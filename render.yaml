@@ -1,0 +1,30 @@
+# Render blueprint. In Render: New > Blueprint, point it at this repo.
+# Free plan: sleeps after ~15 min idle and wakes on the next request (~1 min).
+services:
+  - type: web
+    name: contact-control
+    runtime: python
+    plan: free
+    region: singapore          # closest to India; change if your players are elsewhere
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: LLM_PROVIDER
+        value: openrouter
+      # DATABASE_URL: paste your Neon connection string in the Render dashboard.
+      - key: DATABASE_URL
+        sync: false
+      # Optional shared key for rooms that don't bring their own. Leave unset and
+      # CONTROL simply stays quiet for those rooms (the game still works).
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: nex-agi/nex-n2.5-mini:free,google/gemma-4-31b-it:free,google/gemma-4-26b-a4b-it:free
+      # Daily caps on the shared key only; rooms with their own key are uncapped.
+      - key: SHARED_DAILY_LIMIT
+        value: "45"
+      - key: ROOM_DAILY_LIMIT
+        value: "15"

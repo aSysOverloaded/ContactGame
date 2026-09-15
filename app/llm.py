@@ -26,6 +26,12 @@ class LLMUnavailable(Exception):
     """
 
 
+# Sensible defaults so a host with their own key doesn't have to pick a model.
+DEFAULT_MODELS = {
+    "openrouter": "nex-agi/nex-n2.5-mini:free,google/gemma-4-31b-it:free,google/gemma-4-26b-a4b-it:free",
+    "gemini": "gemini-3.5-flash",
+}
+
 OPENAI_COMPATIBLE = {
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
@@ -44,44 +50,90 @@ def provider() -> str:
     return os.getenv("LLM_PROVIDER", "openrouter").strip().lower()
 
 
-# --- call accounting (the feasibility number: calls per game) ---------------
+# --- call accounting and caps on the shared key -----------------------------
+# A room that brings its own key spends its own free quota and is never capped.
+# Rooms on the server's shared key share one small daily budget between them.
 
-_usage = {"day": date.today().isoformat(), "calls": 0, "failures": 0}
+def _limit(var: str, default: int) -> int:
+    try:
+        return int(os.getenv(var, default))
+    except ValueError:
+        return default
 
 
-def _count(ok: bool) -> None:
+_usage = {"day": date.today().isoformat(), "calls": 0, "failures": 0, "shared": 0, "rooms": {}}
+
+
+def _roll_day() -> None:
     today = date.today().isoformat()
     if _usage["day"] != today:
-        _usage.update(day=today, calls=0, failures=0)
-    _usage["calls"] += 1
-    if not ok:
-        _usage["failures"] += 1
+        _usage.update(day=today, calls=0, failures=0, shared=0, rooms={})
+
+
+def check_budget(room: str | None, own_key: bool) -> None:
+    """Raises LLMUnavailable when the shared key's budget for today is used up."""
+    if own_key:
+        return
+    _roll_day()
+    if _usage["shared"] >= _limit("SHARED_DAILY_LIMIT", 45):
+        raise LLMUnavailable("shared daily quota used up - add your own key to keep CONTROL sharp")
+    if room and _usage["rooms"].get(room, 0) >= _limit("ROOM_DAILY_LIMIT", 15):
+        raise LLMUnavailable("this room used its share of the shared quota - add your own key")
 
 
 def usage() -> dict:
-    return {"provider": provider(), **_usage}
+    _roll_day()
+    return {"provider": provider(), "day": _usage["day"], "calls": _usage["calls"],
+            "failures": _usage["failures"], "shared": _usage["shared"],
+            "sharedLimit": _limit("SHARED_DAILY_LIMIT", 45),
+            "roomLimit": _limit("ROOM_DAILY_LIMIT", 15), "rooms": len(_usage["rooms"])}
+
+
+def _count(ok: bool, room: str | None, own_key: bool) -> None:
+    _roll_day()
+    _usage["calls"] += 1
+    if not ok:
+        _usage["failures"] += 1
+    if not own_key:
+        _usage["shared"] += 1
+        if room:
+            _usage["rooms"][room] = _usage["rooms"].get(room, 0) + 1
 
 
 # --- public entry point -----------------------------------------------------
 
-async def complete(system: str, user: str, *, max_tokens: int = 1000, tag: str = "") -> str:
-    """One system+user turn, returns the text reply. Raises LLMUnavailable."""
+async def complete(system: str, user: str, *, max_tokens: int = 1000, tag: str = "",
+                   key: str | None = None, room: str | None = None) -> str:
+    """One system+user turn, returns the text reply. Raises LLMUnavailable.
+
+    `key` is a room's own provider key; without it the server's shared key is used,
+    subject to the daily caps above.
+    """
     name = provider()
+    own_key = bool(key)
+    # Refused before we spend anything, so it must not count against the budget itself.
+    try:
+        check_budget(room, own_key)
+    except LLMUnavailable as e:
+        log.warning("llm %-10s %-8s REFUSED (%s) | room=%s", name, tag, e, room)
+        raise
     try:
         if name == "fake":
             text = await _fake(system, user)
         elif name in OPENAI_COMPATIBLE:
-            text = await _openai_compatible(name, system, user, max_tokens)
+            text = await _openai_compatible(name, system, user, max_tokens, key)
         elif name == "anthropic":
             text = await _anthropic(system, user, max_tokens)
         else:
             raise LLMUnavailable(f"unknown LLM_PROVIDER {name!r}")
     except LLMUnavailable as e:
-        _count(False)
-        log.warning("llm %-10s %-8s FAILED (%s) | today=%s", name, tag, e, _usage["calls"])
+        _count(False, room, own_key)
+        log.warning("llm %-10s %-8s FAILED (%s) | room=%s own_key=%s today=%s",
+                    name, tag, e, room, own_key, _usage["calls"])
         raise
-    _count(True)
-    log.info("llm %-10s %-8s ok | today=%s", name, tag, _usage["calls"])
+    _count(True, room, own_key)
+    log.info("llm %-10s %-8s ok | room=%s own_key=%s today=%s shared=%s",
+             name, tag, room, own_key, _usage["calls"], _usage["shared"])
     return text
 
 
@@ -98,13 +150,16 @@ def parse_json(text: str):
 _http: httpx.AsyncClient | None = None
 
 
-async def _openai_compatible(name: str, system: str, user: str, max_tokens: int) -> str:
+async def _openai_compatible(name: str, system: str, user: str, max_tokens: int,
+                             key: str | None = None) -> str:
     global _http
     cfg = OPENAI_COMPATIBLE[name]
-    key = os.getenv(cfg["key_env"])
-    model = os.getenv(cfg["model_env"])
-    if not key or not model:
-        raise LLMUnavailable(f"set {cfg['key_env']} and {cfg['model_env']}")
+    key = key or os.getenv(cfg["key_env"])
+    model = os.getenv(cfg["model_env"], DEFAULT_MODELS.get(name, ""))
+    if not key:
+        raise LLMUnavailable("no API key - the room host can add their own free key")
+    if not model:
+        raise LLMUnavailable(f"set {cfg['model_env']}")
     if _http is None:
         _http = httpx.AsyncClient(timeout=20.0)
     # A comma-separated list means "try these in order" (OpenRouter fallback routing);

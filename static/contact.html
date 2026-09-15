@@ -321,7 +321,20 @@ const ui = {
 };
 let ws = null;
 const SESSION_KEY = 'contact-session';
+const DEVICE_KEY = 'contact-device';
 let session = loadSession();   // {code, playerId, name} - lets a device rejoin after a drop
+
+// A lasting id for this browser. It identifies the same person across rooms and games,
+// which is what lets saved slang follow the people who were there.
+function deviceId(){
+  let id = null;
+  try{ id = localStorage.getItem(DEVICE_KEY); }catch(e){}
+  if(!id || !/^[A-Za-z0-9_-]{8,64}$/.test(id)){
+    id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, '');
+    try{ localStorage.setItem(DEVICE_KEY, id); }catch(e){}
+  }
+  return id;
+}
 
 function loadSession(){ try{ return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }catch(e){ return null; } }
 function saveSession(s){ session = s; try{ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }catch(e){} }
@@ -355,7 +368,7 @@ function connect(hello){
     if(session && state){             // dropped mid-game: keep retrying quietly
       ui.reconnecting = true;
       render();
-      setTimeout(() => { if(session && !ws) connect({ type:'join', code: session.code, playerId: session.playerId, name: session.name }); }, 1500);
+      setTimeout(() => { if(session && !ws) connect({ type:'join', code: session.code, playerId: deviceId(), name: session.name }); }, 1500);
     } else {
       render();
     }
@@ -412,17 +425,23 @@ function val(id){ const el = document.getElementById(id); return el ? el.value.t
 function setLobbyMode(m){ ui.lobbyMode = m; ui.error = null; render(); }
 
 function createRoom(){
-  const name = val('lobbyName'), group = val('lobbyGroup');
+  const name = val('lobbyName'), group = val('lobbyGroup'), apiKey = val('lobbyKey');
   if(!name){ ui.error = 'Add your name so everyone knows who is who.'; render(); return; }
   ui.error = null;
-  connect({ type:'create', name, group });
+  connect({ type:'create', name, group, apiKey, playerId: deviceId() });
 }
 
 function joinRoom(){
   const code = val('lobbyCode').toUpperCase(), name = val('lobbyName');
   if(code.length !== 4 || !name){ ui.error = 'Need the 4-letter room code and your name.'; render(); return; }
   ui.error = null;
-  connect({ type:'join', code, name });
+  connect({ type:'join', code, name, playerId: deviceId() });
+}
+
+function saveKey(){
+  const key = val('roomKey');
+  if(!key){ ui.error = 'Paste a key first.'; render(); return; }
+  send('set_key', { key });
 }
 
 function leaveRoom(){
@@ -576,6 +595,11 @@ function renderLobby(){
       <label>Group name</label>
       <input type="text" id="lobbyGroup" maxlength="60" placeholder="e.g. Friday crew">
       <div class="hint">CONTROL remembers each group by this name — use the same one next time and it picks up where it left off.</div>
+    </div>
+    <div class="field">
+      <label>Your own AI key (optional)</label>
+      <input type="password" id="lobbyKey" autocomplete="off" placeholder="sk-or-v1-…">
+      <div class="hint">Without a key your game shares this site's small daily allowance, and CONTROL goes quiet once it runs out. A free key from <b>openrouter.ai/keys</b> takes two minutes, needs no card, and gives your group its own allowance. It stays on the server for this room only.</div>
     </div>` : ''}
     ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
     <button class="btn btn-primary" onclick="${join ? 'joinRoom()' : 'createRoom()'}">${join ? 'Join the channel' : 'Create room'}</button>
@@ -615,6 +639,15 @@ function renderSetup(){
       <div class="hint">Words and meanings your group saved after CONTROL missed them. CONTROL checks these whenever the letters fit${host ? ' — tap ✕ to remove one' : ''}.</div>
     </div>` : `
     <div class="field"><div class="hint">CONTROL doesn't know your group's local words yet. Whenever it misses a clue, you'll get the option to save that word and what it means, and CONTROL will use it from then on.</div></div>`}
+    <div class="field">
+      <label>CONTROL's power supply</label>
+      ${state.ownKey
+        ? `<div class="hint" style="color:var(--teal);">Running on this room's own key — your group has its own daily allowance.</div>`
+        : `<div class="hint">Sharing this site's small daily allowance. When it runs out CONTROL stops guessing and the game carries on without it.</div>
+           ${host ? `
+           <input type="password" id="roomKey" autocomplete="off" placeholder="Paste a free openrouter.ai key">
+           <button class="btn btn-outline" onclick="saveKey()">Use our own key</button>` : ''}`}
+    </div>
     ${host ? `
     ${ui.error ? `<div class="banner-error">${esc(ui.error)}</div>` : ''}
     <button class="btn btn-primary" onclick="beginGame()">Open the channel</button>
@@ -872,8 +905,8 @@ function renderFullGuess(){
 }
 
 // ---------- boot ----------
-if(session && session.code && session.playerId){
-  connect({ type:'join', code: session.code, playerId: session.playerId, name: session.name });
+if(session && session.code){
+  connect({ type:'join', code: session.code, playerId: deviceId(), name: session.name });
 } else {
   render();
 }

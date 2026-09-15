@@ -89,13 +89,14 @@ def _fallback(difficulty: str, used: list[str]) -> str:
     return random.choice(pool)
 
 
-async def pick_secret_word(difficulty: str, used: list[str]) -> tuple[str, str, str]:
+async def pick_secret_word(difficulty: str, used: list[str], **creds) -> tuple[str, str, str]:
     """Returns (WORD, flavor, source). The local dictionary is deliberately never sent here:
     the secret must stay a plain, universal English word."""
     user = (f"{DIFF_TEXT.get(difficulty, DIFF_TEXT['medium'])} Do not reuse any of these already-used words: "
             f"{', '.join(used) or 'none yet'}.")
     try:
-        reply = PickReply.model_validate(llm.parse_json(await llm.complete(PICK_SYSTEM, user, tag="pick")))
+        reply = PickReply.model_validate(
+            llm.parse_json(await llm.complete(PICK_SYSTEM, user, tag="pick", **creds)))
         w = re.sub(r"[^A-Z]", "", reply.word.upper())
         if 3 <= len(w) <= 15 and w not in used:
             return w, reply.flavor, "control"
@@ -113,7 +114,7 @@ def relevant_terms(dictionary: list[dict], prefix: str) -> list[dict]:
     return [t for t in dictionary if t["term"].upper().startswith(p)]
 
 
-async def wordmaster_guess(prefix: str, clue: str, dictionary: list[dict]) -> dict | None:
+async def wordmaster_guess(prefix: str, clue: str, dictionary: list[dict], **creds) -> dict | None:
     """{'guess', 'reasoning'} or None if CONTROL couldn't get a read (quota, unreadable reply)."""
     terms = relevant_terms(dictionary, prefix)
     glossary = ""
@@ -125,7 +126,7 @@ async def wordmaster_guess(prefix: str, clue: str, dictionary: list[dict]) -> di
     user = (f'The word must start with: "{prefix}". The clue just given was: "{clue}".'
             + glossary + " Guess the single word being described.")
     try:
-        text = await llm.complete(GUESS_SYSTEM, user, tag="guess")
+        text = await llm.complete(GUESS_SYSTEM, user, tag="guess", **creds)
     except llm.LLMUnavailable as e:
         log.info("guess unavailable: %s", e)
         return None

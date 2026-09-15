@@ -3,4 +3,5 @@ uvicorn[standard]
 httpx
 anthropic
 python-dotenv
+asyncpg
 pytest

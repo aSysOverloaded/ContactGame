@@ -61,14 +61,42 @@ def test_plain_text_guess_is_salvaged():
 
 def test_dictionary_db_keeps_every_example(tmp_path, monkeypatch):
     from app import db
-    monkeypatch.setattr(db, "DB_PATH", tmp_path / "d.db")
-    db.add_reference("Fun Friday", "garbage", "adopted child", "GARDEN", "Ana")
-    db.add_reference("fun  friday", "Garbage", "picked up as a baby", None, "Ben")
-    db.add_reference("Other group", "garbage", "trash", None, "Cy")
-    d = db.load_dictionary("FUN FRIDAY")
-    assert d == [{"term": "Garbage", "meaning": "picked up as a baby / adopted child", "examples": 2}]
-    db.delete_term("Fun Friday", "GARBAGE")
-    assert db.load_dictionary("Fun Friday") == [] and len(db.load_dictionary("Other group")) == 1
+    monkeypatch.setattr(db, "SQLITE_PATH", tmp_path / "d.db")
+    ana = [{"id": "dev-ana", "name": "Ana"}, {"id": "dev-ben", "name": "Ben"}]
+
+    async def main():
+        await db.add_reference("Fun Friday", "garbage", "adopted child", "GARDEN", "Ana", "dev-ana", ana)
+        await db.add_reference("fun  friday", "Garbage", "picked up as a baby", None, "Ben", "dev-ben", ana)
+        await db.add_reference("Other group", "garbage", "trash", None, "Cy", "dev-cy", [])
+        d = await db.load_dictionary("FUN FRIDAY")
+        assert d == [{"term": "Garbage", "meaning": "picked up as a baby / adopted child", "examples": 2}]
+        await db.delete_term("Fun Friday", "GARBAGE")
+        assert await db.load_dictionary("Fun Friday") == []
+        assert len(await db.load_dictionary("Other group")) == 1
+
+    asyncio.run(main())
+
+
+def test_shared_quota_caps(monkeypatch):
+    from app import llm
+    monkeypatch.setenv("SHARED_DAILY_LIMIT", "3")
+    monkeypatch.setenv("ROOM_DAILY_LIMIT", "2")
+    monkeypatch.setattr(llm, "_usage", {"day": llm.date.today().isoformat(), "calls": 0,
+                                        "failures": 0, "shared": 0, "rooms": {}})
+
+    async def main():
+        for _ in range(2):
+            await llm.complete("sys", "user", room="AAAA")
+        with pytest.raises(llm.LLMUnavailable, match="this room used its share"):
+            await llm.complete("sys", "user", room="AAAA")
+        # A room with its own key is never capped.
+        await llm.complete("sys", "user", room="AAAA", key="sk-or-v1-theirownkey")
+        await llm.complete("sys", "user", room="BBBB")
+        with pytest.raises(llm.LLMUnavailable, match="shared daily quota"):
+            await llm.complete("sys", "user", room="CCCC")
+
+    asyncio.run(main())
+    assert llm.usage()["shared"] == 3
 
 
 def test_fallbacks_when_llm_unavailable(monkeypatch):
@@ -126,11 +154,16 @@ def test_multiplayer_game_and_no_leaks():
     # One shared event loop for both sockets, like a real uvicorn server.
     with TestClient(app) as tc, tc.websocket_connect("/ws") as ws_a, tc.websocket_connect("/ws") as ws_b:
         a, b = Client(ws_a), Client(ws_b)
-        a.send(type="create", name="Ana", group="Test Crew")
-        code = a.expect("joined")["code"]
-        b.send(type="join", code=code, name="Ben")
+        a.send(type="create", name="Ana", group="Test Crew",
+               playerId="device-ana", apiKey="sk-or-v1-anas-own-free-key")
+        joined = a.expect("joined")
+        code, = (joined["code"],)
+        assert joined["playerId"] == "device-ana"     # the browser's lasting id is kept
+        b.send(type="join", code=code, name="Ben", playerId="device-ben")
         b.expect("joined")
-        a.until(lambda s: len(s["players"]) == 2)
+        s = a.until(lambda s: len(s["players"]) == 2)
+        assert s["ownKey"] is True                    # room runs on its own quota
+        assert "own-free-key" not in json.dumps(s)    # and the key never reaches players
 
         b.send(type="begin_game")
         assert b.expect("error")["message"] == "Only the host can do that."
@@ -249,7 +282,7 @@ def test_callers_word_being_the_secret_ends_round_on_a_miss():
 def test_reconnect_keeps_player():
     with TestClient(app) as tc:
         with tc.websocket_connect("/ws") as ws:
-            ws.send_json({"type": "create", "name": "Ana", "group": "Reconnectors"})
+            ws.send_json({"type": "create", "name": "Ana", "group": "Reconnectors", "playerId": "device-ana"})
             joined = ws.receive_json()
         with tc.websocket_connect("/ws") as ws:
             ws.send_json({"type": "join", "code": joined["code"], "playerId": joined["playerId"]})

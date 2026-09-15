@@ -13,6 +13,7 @@ import asyncio
 import logging
 import os
 import random
+import re
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -25,6 +26,8 @@ log = logging.getLogger("control.rooms")
 
 COUNTDOWN_SECONDS = float(os.getenv("COUNTDOWN_SECONDS", "2.4"))  # 5 steps x 480ms, as before
 EMPTY_ROOM_TTL = 15 * 60
+MAX_PLAYERS = 12
+MAX_ROOMS = 200
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # no I/O - easy to read aloud
 
 
@@ -45,6 +48,7 @@ class Room:
     group: str
     host_id: str
     dictionary: list[dict]       # this group's local references, see db.load_dictionary
+    api_key: str | None = None   # the host's own provider key; never leaves the server
     difficulty: str = "medium"
     phase: str = "setup"
     players: dict[str, Player] = field(default_factory=dict)
@@ -86,6 +90,7 @@ class Room:
             "loading": self.loading,
             "loadingLabel": self.loading_label,
             "dictionary": self.dictionary,
+            "ownKey": bool(self.api_key),
             "revealed": self.revealed,
             "guesses": self.guesses,
             "secretWord": self.secret if self.phase == "won" else "",
@@ -131,6 +136,14 @@ class Room:
         if pid != self.host_id:
             raise ActionError("Only the host can do that.")
 
+    def creds(self) -> dict:
+        """What the LLM layer needs: this room's own key (if any) and who to bill the caps to."""
+        return {"key": self.api_key, "room": self.code}
+
+    def witnesses(self) -> list[dict]:
+        """Who was in the room - stored with each saved reference for people-based memory later."""
+        return [{"id": p.id, "name": p.name} for p in self.players.values() if p.sockets > 0]
+
     def player_name(self, pid: str, typed: str = "") -> str:
         """Typed name wins (pass-the-phone), else the device's player name."""
         typed = str(typed or "").strip()[:24]
@@ -151,8 +164,14 @@ class Room:
         term = str(msg.get("term", ""))
         if not any(t["term"].lower() == term.lower() for t in self.dictionary):
             raise ActionError("No such entry.")
-        db.delete_term(self.group, term)
-        self.dictionary = db.load_dictionary(self.group)
+        await db.delete_term(self.group, term)
+        self.dictionary = await db.load_dictionary(self.group)
+
+    async def a_set_key(self, pid, msg):
+        """Host adds (or clears) their own provider key, e.g. when the shared quota runs out."""
+        self.need_host(pid)
+        self.api_key = clean_api_key(msg.get("key"))
+        log.info("room %s own key %s", self.code, "set" if self.api_key else "cleared")
 
     async def a_begin_game(self, pid, msg):
         """beginGame"""
@@ -164,7 +183,8 @@ class Room:
         self.loading, self.loading_label = True, label
         await self.broadcast()
         try:
-            word, flavor, source = await game.pick_secret_word(self.difficulty, self.used_words)
+            word, flavor, source = await game.pick_secret_word(
+                self.difficulty, self.used_words, **self.creds())
         finally:
             self.loading = False
         log.info("room %s round %d word from %s", self.code, self.round, source)
@@ -200,7 +220,8 @@ class Room:
         if not game.normalize_strict(word).startswith(self.revealed.lower()):
             raise ActionError(f"Your word has to start with {self.revealed}.")
         self.clue.update(text=text, giverWord=word, giverName=self.player_name(pid, msg.get("name")))
-        self.guess_task = asyncio.create_task(game.wordmaster_guess(self.revealed, text, self.dictionary))
+        self.guess_task = asyncio.create_task(
+            game.wordmaster_guess(self.revealed, text, self.dictionary, **self.creds()))
         self.phase = "clue-shown"
 
     async def a_no_contact(self, pid, msg):
@@ -311,8 +332,9 @@ class Room:
         meaning = str(msg.get("meaning") or r["clue"]).strip()[:300]
         if not game.normalize_strict(term) or not meaning:
             raise ActionError("Need the word and what it means.")
-        db.add_reference(self.group, term, meaning, r["controlGuess"], self.player_name(pid))
-        self.dictionary = db.load_dictionary(self.group)
+        await db.add_reference(self.group, term, meaning, r["controlGuess"],
+                               self.player_name(pid), pid, self.witnesses())
+        self.dictionary = await db.load_dictionary(self.group)
         r["saved"] = True
         log.info("room %s saved reference %r = %r", self.code, term, meaning)
 
@@ -377,10 +399,30 @@ def _new_code() -> str:
             return code
 
 
-def create_room(group: str, host_name: str) -> tuple[Room, str]:
+def clean_player_id(pid: str | None) -> str:
+    """A device's lasting id, made by the browser. Kept if it looks sane, else replaced."""
+    pid = str(pid or "").strip()
+    return pid if re.fullmatch(r"[A-Za-z0-9_-]{8,64}", pid) else secrets.token_urlsafe(8)
+
+
+def clean_api_key(key: str | None) -> str | None:
+    key = str(key or "").strip()
+    if not key:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9._\-]{20,200}", key):
+        raise ActionError("That doesn't look like an API key.")
+    return key
+
+
+async def create_room(group: str, host_name: str, pid: str | None, api_key: str | None) -> tuple[Room, str]:
     group = group.strip()[:60] or "friends"
-    pid = secrets.token_urlsafe(8)
-    room = Room(code=_new_code(), group=group, host_id=pid, dictionary=db.load_dictionary(group))
+    if len(ROOMS) >= MAX_ROOMS:
+        sweep_empty_rooms()
+    if len(ROOMS) >= MAX_ROOMS:
+        raise ActionError("Too many rooms open right now, try again in a few minutes.")
+    pid = clean_player_id(pid)
+    room = Room(code=_new_code(), group=group, host_id=pid, api_key=clean_api_key(api_key),
+                dictionary=await db.load_dictionary(group))
     room.players[pid] = Player(pid, host_name.strip()[:24] or "Host")
     ROOMS[room.code] = room
     log.info("room %s created for group %r", room.code, group)
@@ -391,9 +433,11 @@ def join_room(code: str, name: str, pid: str | None) -> tuple[Room, str]:
     room = ROOMS.get(code.strip().upper())
     if room is None:
         raise ActionError("No room with that code.")
-    if pid and pid in room.players:           # reconnect
+    pid = clean_player_id(pid)
+    if pid in room.players:                   # same device rejoining
         return room, pid
-    pid = secrets.token_urlsafe(8)
+    if len(room.players) >= MAX_PLAYERS:
+        raise ActionError("That room is full.")
     room.players[pid] = Player(pid, name.strip()[:24] or f"Player {len(room.players) + 1}")
     return room, pid
 

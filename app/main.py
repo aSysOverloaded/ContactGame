@@ -6,6 +6,7 @@ Phones on the same Wi-Fi open http://<laptop-ip>:8000
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -18,12 +19,15 @@ from fastapi.responses import FileResponse, PlainTextResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from . import game, llm, rooms  # noqa: E402
+from . import db, game, llm, rooms  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("control")
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
+
+
+DEBUG_ENDPOINTS = os.getenv("DEBUG_ENDPOINTS", "").lower() in ("1", "true", "yes")
 
 
 @asynccontextmanager
@@ -33,10 +37,13 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(60)
             rooms.sweep_empty_rooms()
 
+    await db.connect()
     task = asyncio.create_task(sweeper())
-    log.info("LLM provider: %s", llm.provider())
+    log.info("LLM provider: %s | storage: %s | debug endpoints: %s", llm.provider(),
+             "postgres" if db.database_url() else f"sqlite ({db.SQLITE_PATH.name})", DEBUG_ENDPOINTS)
     yield
     task.cancel()
+    await db.disconnect()
 
 
 app = FastAPI(title="Contact / CONTROL", lifespan=lifespan)
@@ -46,14 +53,16 @@ app = FastAPI(title="Contact / CONTROL", lifespan=lifespan)
 
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
-    """First message: {"type":"create","name","group"} or {"type":"join","code","name","playerId"?}.
+    """First message: {"type":"create","name","group","playerId","apiKey"?}
+    or {"type":"join","code","name","playerId"}. playerId is the browser's lasting device id.
     After that, every message is a room action (see Room.a_* in rooms.py)."""
     await ws.accept()
     room = None
     try:
         hello = await ws.receive_json()
         if hello.get("type") == "create":
-            room, pid = rooms.create_room(str(hello.get("group", "")), str(hello.get("name", "")))
+            room, pid = await rooms.create_room(str(hello.get("group", "")), str(hello.get("name", "")),
+                                                hello.get("playerId"), hello.get("apiKey"))
         elif hello.get("type") == "join":
             room, pid = rooms.join_room(str(hello.get("code", "")), str(hello.get("name", "")),
                                         hello.get("playerId"))
@@ -82,8 +91,8 @@ async def ws_endpoint(ws: WebSocket):
             await room.broadcast()
 
 
-# --- standalone backend checks (use via /docs) --------------------------------------
-# Each call spends one request from the free quota.
+# --- standalone backend checks --------------------------------------------------
+# These spend quota, so they are off unless DEBUG_ENDPOINTS=1 (never on the public site).
 
 class PickIn(BaseModel):
     difficulty: str = "medium"
@@ -95,24 +104,28 @@ class GuessIn(BaseModel):
     group: str | None = None
 
 
-@app.post("/api/debug/pick-word")
-async def debug_pick(body: PickIn):
-    word, flavor, source = await game.pick_secret_word(body.difficulty, [])
-    return {"word": word, "flavor": flavor, "source": source}
+if DEBUG_ENDPOINTS:
+    @app.post("/api/debug/pick-word")
+    async def debug_pick(body: PickIn):
+        word, flavor, source = await game.pick_secret_word(body.difficulty, [])
+        return {"word": word, "flavor": flavor, "source": source}
 
-
-@app.post("/api/debug/guess")
-async def debug_guess(body: GuessIn):
-    from . import db
-    dictionary = db.load_dictionary(body.group) if body.group else []
-    return await game.wordmaster_guess(body.prefix.upper(), body.clue, dictionary) or {"guess": None}
+    @app.post("/api/debug/guess")
+    async def debug_guess(body: GuessIn):
+        dictionary = await db.load_dictionary(body.group) if body.group else []
+        return await game.wordmaster_guess(body.prefix.upper(), body.clue, dictionary) or {"guess": None}
 
 
 @app.get("/api/dictionary/{group}")
 async def dictionary(group: str):
     """Every local reference saved by a group - the growing slang corpus."""
-    from . import db
-    return db.load_dictionary(group)
+    return await db.load_dictionary(group)
+
+
+@app.get("/healthz")
+async def healthz():
+    """Render pings this; it also wakes the service after a sleep."""
+    return {"ok": True, "rooms": len(rooms.ROOMS)}
 
 
 @app.get("/api/usage")
